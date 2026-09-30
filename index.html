@@ -28,7 +28,11 @@ header{display:flex;flex-direction:column;gap:4px}
   text-shadow:3px 3px 0 var(--purple),6px 6px 0 var(--orange);margin:0;transform:rotate(-2deg);transform-origin:left;width:max-content;max-width:100%}
 .sub{font-family:var(--f-serif);color:var(--fg);font-size:.95rem;margin:8px 0 0;background:var(--surface);padding:4px 12px;border-radius:99px;width:max-content;max-width:100%;box-shadow:0 2px 8px rgba(0,0,0,.12)}
 .stage{position:relative;background:var(--surface);border-radius:14px;padding:12px;border:1px solid var(--line)}
-#preview{width:100%;height:auto;display:block;border-radius:4px;touch-action:none;cursor:grab;box-shadow:0 6px 18px rgba(40,30,10,.18)}
+#preview{display:block;width:auto;height:auto;max-width:100%;max-height:64vh;margin:0 auto;border-radius:4px;touch-action:pan-y pinch-zoom;box-shadow:0 6px 18px rgba(40,30,10,.18)}
+#preview.moving{touch-action:none;cursor:grab;outline:4px solid var(--jelly);outline-offset:3px}
+.movebar{display:flex;justify-content:center;margin-top:10px}
+.movebtn{appearance:none;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);font:500 .9rem var(--f-body);padding:8px 16px;border-radius:99px;cursor:pointer}
+.movebtn[aria-pressed="true"]{background:var(--jelly);border-color:var(--jelly);color:#2F2A22;font-weight:700}
 .hint{font-size:.85rem;color:var(--muted);margin:8px 2px 0;text-align:center}
 .tag{position:absolute;top:22px;left:22px;background:var(--purple);color:#fff;font-size:.75rem;padding:2px 10px;border-radius:99px;letter-spacing:.1em}
 .shoot{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -79,7 +83,8 @@ input[type=range]{width:100%;accent-color:var(--purple)}
   <div class="stage">
     <span class="tag" id="sampleTag">範例照片</span>
     <canvas id="preview" width="1080" height="1350" aria-label="拍立得預覽"></canvas>
-    <p class="hint" id="hint">拍好後可以用手指拖曳照片，調整位置</p>
+    <div class="movebar"><button type="button" class="movebtn" id="move" aria-pressed="false">調整照片位置</button></div>
+    <p class="hint" id="hint">按「調整照片位置」後，用手指拖曳照片；調好再按一次「完成調整」</p>
   </div>
 
   <div class="shoot">
@@ -162,7 +167,7 @@ input[type=range]{width:100%;accent-color:var(--purple)}
 <div class="sheet" id="sheet" hidden>
   <img id="out" alt="完成的小人迷走中拍立得">
   <div class="acts" id="acts">
-    <button class="btn primary" id="dl" type="button">
+    <button class="btn primary" id="dl" hidden type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>
       下載到裝置</button>
     <button class="btn ig" id="share" type="button">
@@ -170,7 +175,7 @@ input[type=range]{width:100%;accent-color:var(--purple)}
       分享到 IG</button>
   </div>
   <div class="say">
-    <p id="msg">按「分享到 IG」會跳出分享選單，選 Instagram 就能發貼文或限動，記得標 <b>#小人迷走中</b></p>
+    <p id="msg">按「分享到 IG」會跳出分享選單，選 Instagram 就能發貼文或限動，記得標 <b>#小人迷走中</b><br>也可以按分享以後選<b>「儲存影像」</b>，存到手機相簿</p>
     <p class="small" id="fallback">按鈕沒反應的話：<b>長按上面的照片</b> → 「加入照片」或「儲存圖片」，再到 IG 上傳</p>
   </div>
   <div class="acts">
@@ -358,7 +363,11 @@ document.getElementById("zoom").addEventListener("input",e=>{st.zoom=+e.target.v
 
 // drag to pan
 let drag=null;
-cv.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId);cv.style.cursor="grabbing";});
+const moveBtn=document.getElementById("move");
+const canMove=e=>e.pointerType==="mouse"||cv.classList.contains("moving");
+moveBtn.addEventListener("click",()=>{const on=!cv.classList.contains("moving");
+  cv.classList.toggle("moving",on);moveBtn.setAttribute("aria-pressed",on);moveBtn.textContent=on?"完成調整":"調整照片位置";});
+cv.addEventListener("pointerdown",e=>{if(!canMove(e))return;drag={x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId);cv.style.cursor="grabbing";});
 cv.addEventListener("pointermove",e=>{if(!drag)return;
   const k=cv.width/cv.getBoundingClientRect().width/(st.fmt==="story"?STORY_SCALE:1);
   st.ox+=(e.clientX-drag.x)*k;st.oy+=(e.clientY-drag.y)*k;drag={x:e.clientX,y:e.clientY};render();});
@@ -374,7 +383,7 @@ document.getElementById("make").addEventListener("click",async()=>{
   await refresh();
   document.getElementById("out").src=cv.toDataURL("image/jpeg",.92);
   document.getElementById("sheet").hidden=false;
-  msg('按「分享到 IG」會跳出分享選單，選 Instagram 就能發貼文或限動，記得標 <b>#小人迷走中</b>');
+  msg('按「分享到 IG」會跳出分享選單，選 Instagram 就能發貼文或限動，記得標 <b>#小人迷走中</b><br>也可以按分享以後選<b>「儲存影像」</b>，存到手機相簿');
   lastBlob=await new Promise(r=>cv.toBlob(r,"image/jpeg",.92));
 });
 let dlCap=null;
