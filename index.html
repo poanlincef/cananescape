@@ -32,6 +32,14 @@ header{display:flex;flex-direction:column;gap:4px}
 #preview.moving{touch-action:none;cursor:grab;outline:4px solid var(--jelly);outline-offset:3px}
 .movebar{display:flex;justify-content:center;margin-top:10px}
 .movebtn{appearance:none;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);font:500 .9rem var(--f-body);padding:8px 16px;border-radius:99px;cursor:pointer}
+.movebtn{display:inline-flex;align-items:center;gap:6px}
+.movebtn svg{width:18px;height:18px}
+.adjust{margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.adjust-tip{margin:0;font-size:.88rem;color:var(--fg);text-align:center}
+.zoomrow{display:flex;align-items:center;gap:10px}
+.zoomrow input{flex:1;min-width:0}
+.zi{font-weight:700;color:var(--muted);width:1.2em;text-align:center}
+.linkbtn{align-self:center;appearance:none;border:0;background:none;color:var(--hint);font:500 .82rem var(--f-body);text-decoration:underline;cursor:pointer;padding:4px}
 .movebtn[aria-pressed="true"]{background:var(--jelly);border-color:var(--jelly);color:#2F2A22;font-weight:700}
 .hint{font-size:.85rem;color:var(--muted);margin:8px 2px 0;text-align:center}
 .tag{position:absolute;top:22px;left:22px;background:var(--purple);color:#fff;font-size:.75rem;padding:2px 10px;border-radius:99px;letter-spacing:.1em}
@@ -84,8 +92,19 @@ input[type=range]{width:100%;accent-color:var(--purple)}
   <div class="stage">
     <span class="tag" id="sampleTag">範例照片</span>
     <canvas id="preview" width="1080" height="1350" aria-label="拍立得預覽"></canvas>
-    <div class="movebar"><button type="button" class="movebtn" id="move" aria-pressed="false">調整照片位置</button></div>
-    <p class="hint" id="hint">按「調整照片位置」後，用手指拖曳照片；調好再按一次「完成調整」</p>
+    <div class="movebar"><button type="button" class="movebtn" id="move" aria-pressed="false" aria-controls="adjust">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M12 3l-3 3m3-3 3 3M12 21l-3-3m3 3 3-3M3 12l3-3m-3 3 3 3M21 12l-3-3m3 3-3 3"/></svg>
+      <span id="moveLabel">調整圖片</span></button></div>
+    <p class="hint" id="hint" hidden></p>
+    <div class="adjust" id="adjust" hidden>
+      <p class="adjust-tip">用手指<b>拖曳上面的照片</b>移動位置，拉下面的滑桿放大縮小。調好按「完成」。</p>
+      <div class="zoomrow">
+        <span class="zi" aria-hidden="true">－</span>
+        <input id="zoom" type="range" min="1" max="3" step="0.01" value="1" aria-label="照片縮放">
+        <span class="zi" aria-hidden="true">＋</span>
+      </div>
+      <button type="button" class="linkbtn" id="resetPos">回到原本的位置</button>
+    </div>
   </div>
 
   <div class="shoot">
@@ -155,11 +174,6 @@ input[type=range]{width:100%;accent-color:var(--purple)}
         <button type="button" data-v="5" aria-pressed="false">路 19:5</button>
         <button type="button" data-v="0" aria-pressed="false">不放</button>
       </div>
-    </div>
-
-    <div class="row">
-      <label for="zoom">照片縮放</label>
-      <input id="zoom" type="range" min="1" max="3" step="0.01" value="1">
     </div>
   </div>
 
@@ -348,9 +362,9 @@ async function refresh(){await ensureFonts();render();}
 async function takeFile(f){
   if(!f)return;
   const url=URL.createObjectURL(f);
-  try{st.img=await loadImg(url);st.isSample=false;st.zoom=1;st.ox=st.oy=0;
+  try{st.img=await loadImg(url);st.isSample=false;document.getElementById("hint").hidden=true;st.zoom=1;st.ox=st.oy=0;
     document.getElementById("zoom").value=1;document.getElementById("sampleTag").hidden=true;refresh();}
-  catch(e){document.getElementById("hint").textContent="這張照片讀不進來，換一張試試看（格式請用 JPG 或 PNG）";}
+  catch(e){const h=document.getElementById("hint");h.textContent="這張照片讀不進來，換一張試試看（格式請用 JPG 或 PNG）";h.hidden=false;}
 }
 ["cam","lib"].forEach(id=>document.getElementById(id).addEventListener("change",e=>{takeFile(e.target.files[0]);e.target.value="";}));
 
@@ -369,7 +383,10 @@ let drag=null;
 const moveBtn=document.getElementById("move");
 const canMove=e=>e.pointerType==="mouse"||cv.classList.contains("moving");
 moveBtn.addEventListener("click",()=>{const on=!cv.classList.contains("moving");
-  cv.classList.toggle("moving",on);moveBtn.setAttribute("aria-pressed",on);moveBtn.textContent=on?"完成調整":"調整照片位置";});
+  cv.classList.toggle("moving",on);moveBtn.setAttribute("aria-pressed",on);
+  document.getElementById("moveLabel").textContent=on?"完成":"調整圖片";
+  document.getElementById("adjust").hidden=!on;});
+document.getElementById("resetPos").addEventListener("click",()=>{st.zoom=1;st.ox=st.oy=0;document.getElementById("zoom").value=1;render();});
 cv.addEventListener("pointerdown",e=>{if(!canMove(e))return;drag={x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId);cv.style.cursor="grabbing";});
 cv.addEventListener("pointermove",e=>{if(!drag)return;
   const k=cv.width/cv.getBoundingClientRect().width/(st.fmt==="story"?STORY_SCALE:1);
